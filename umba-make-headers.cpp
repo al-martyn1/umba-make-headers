@@ -5,7 +5,7 @@
 #include <sstream>
 #include <map>
 #include <set>
-
+#include <cstdio>
 
 //----------------------------------------------------------------------------
 inline
@@ -202,6 +202,7 @@ int main( int argc, char *argv[])
     std::string incPathPrefix;
     std::string namelistName = "namelist.txt";
     bool        includeModeUser = false;
+    bool        cleanMode       = false;
 
     std::vector< std::string > opts;
 
@@ -235,6 +236,7 @@ int main( int argc, char *argv[])
                  << "    -w, --where                    - print full path to self executable" << endl
                  << "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl
                  << "    -i=val, --include-prefix=val   - include prefix (path)" << endl
+                 << "    -c, --clean                    - clean generated files" << endl
                  << "    -u, --user-include[s]          - user quotes instead of <>" << endl
                  << "'=' sign can be ommited" << endl
                  << "" << endl
@@ -276,6 +278,11 @@ int main( int argc, char *argv[])
         {
             ++optIt; // -u, --user-include[s]
             includeModeUser = true;
+        }
+        else if (opt=="-c" || opt=="--clean")
+        {
+            ++optIt; // -u, --user-include[s]
+            cleanMode = true;
         }
         /*
         else if (opt=="" || opt=="")
@@ -407,6 +414,12 @@ int main( int argc, char *argv[])
             closeQuot = '\"';
         }
 
+        if (cleanMode)
+        {
+            std::remove(typeName.c_str());
+            continue;
+        }
+
 
         std::ofstream ofs( typeName.c_str() ); //  ( nit->first.c_str());
 
@@ -453,8 +466,10 @@ int main( int argc, char *argv[])
 
     }
 
-
-    cout << "Total files generated: " << totalFilesGenerated << endl;
+    if (cleanMode)
+        cout << "Total files removed: " << totalFilesGenerated << endl;
+    else
+        cout << "Total files generated: " << totalFilesGenerated << endl;
 
 
     #if 0
