@@ -116,9 +116,10 @@ bool readNamelists( const std::string                              &namelistName
         return false;
     }
 
-    std::string typeInfoStr;
 
-    std::string includeStr = "#include";
+    std::set<std::string> lastIncludes;
+
+    std::string typeInfoStr;
 
 
     while( std::getline(istrteamNamelist, typeInfoStr ) )
@@ -138,7 +139,7 @@ bool readNamelists( const std::string                              &namelistName
             iss >> kwd;
             iss >> name;
 
-            if (kwd!=includeStr)
+            if (kwd!="#include")
                 continue;
 
             if (name.empty())
@@ -166,15 +167,18 @@ bool readNamelists( const std::string                              &namelistName
         std::string typeName;
         iss >> typeName;
 
-        if (usedNames.find(typeName)!=usedNames.end())
-            continue;
+        if (usedNames.find(typeName)==usedNames.end())
+        {
+            namesOrder.push_back(typeName);
+        }
 
         usedNames.insert(typeName);
-        namesOrder.push_back(typeName);
 
         // !!! namesOrder
 
         std::string tmpName;
+
+        std::set<std::string> curIncludes;
 
         while(iss>>tmpName)
         {
@@ -184,8 +188,27 @@ bool readNamelists( const std::string                              &namelistName
             if (tmpName[0]=='#' || tmpName[0]==';')
                 break;
 
-            names[typeName].insert(tmpName);
+            curIncludes.insert(tmpName);
+
+            //names[typeName].insert(tmpName);
         }
+
+        if (curIncludes.empty())
+            curIncludes  = lastIncludes;
+        else
+            lastIncludes = curIncludes;
+
+        names[typeName].insert( curIncludes.begin(), curIncludes.end() );
+
+        /*
+        if (typeName=="swap")
+        {
+            cout << "swap includes:" << endl;
+            for( std::set<std::string>::const_iterator it=curIncludes.begin(); it!=curIncludes.end(); ++it )
+                cout << *it << endl;
+        }
+        */
+
     }
 
     return true;
@@ -371,7 +394,7 @@ int main( int argc, char *argv[])
 
     unsigned totalFilesGenerated = 0;
 
-    std::set<std::string> lastIncludes;
+    //std::set<std::string> lastIncludes;
 
     std::vector< std::string >::const_iterator nameIt = namesOrder.begin();
 
@@ -387,13 +410,13 @@ int main( int argc, char *argv[])
         std::map< std::string, std::set<std::string> >::const_iterator nit = names.find(typeName);
         if (nit==names.end() || nit->second.empty())
         {
-            includesSet = lastIncludes;
-            // cout << "Name '" << name << "' found in order list, but not found in set"
+            //includesSet = lastIncludes;
+            cout << "Name '" << typeName << "' found in order list, but not found in set" << endl;
         }
         else
         {
             includesSet  = nit->second;
-            lastIncludes = includesSet;
+            //lastIncludes = includesSet;
         }
 
         // !!!
