@@ -417,6 +417,7 @@ int main( int argc, char *argv[])
         if (cleanMode)
         {
             std::remove(typeName.c_str());
+            ++totalFilesGenerated;
             continue;
         }
 
