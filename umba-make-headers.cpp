@@ -139,6 +139,9 @@ bool readNamelists( const std::string                              &namelistName
             iss >> kwd;
             iss >> name;
 
+            if (kwd=="#break")
+                return true;
+
             if (kwd!="#include")
                 continue;
 
