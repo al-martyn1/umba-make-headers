@@ -218,6 +218,32 @@ std::string appendPath( const std::string &p, const std::string &n )
 
 //----------------------------------------------------------------------------
 inline
+bool isIncludeQuoted( const std::string &s )
+{
+    if (s.size()<2)
+        return false;
+
+    if (s[0]=='\"' && s[s.size()-1]=='\"')
+        return true;
+
+    if (s[0]=='<' && s[s.size()-1]=='>')
+        return true;
+
+    return false;
+}
+
+//----------------------------------------------------------------------------
+inline
+std::string quoteInclude( const std::string &s, bool bUserInclude )
+{
+    if (!bUserInclude)
+        return std::string("<") + s + std::string(">");
+    else
+        return std::string("\"") + s + std::string("\"");
+}
+
+//----------------------------------------------------------------------------
+inline
 bool readNamelists( const std::string                              &namelistName
                   , std::vector< std::string >                     &namesOrder
                   , std::set<std::string>                          &usedNames
@@ -378,7 +404,7 @@ int main( int argc, char *argv[])
 
     std::string namespaceName;
     std::string namespaceGuardName;
-    std::string incPathPrefix;
+    //std::string incPathPrefix;
     std::string namelistName = "namelist.txt";
     bool        includeModeUser = false;
     bool        cleanMode       = false;
@@ -420,7 +446,7 @@ int main( int argc, char *argv[])
                  << "    -h, --help                     - print this help and exit" << endl
                  << "    -w, --where                    - print full path to self executable" << endl
                  /*<< "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl */
-                 << "    -i=val, --include-prefix=val   - include prefix (path)" << endl
+                 /*<< "    -i=val, --include-prefix=val   - include prefix (path)" << endl */
                  << "    -c, --clean                    - clean generated files" << endl
                  << "    -u, --user-include[s]          - user quotes instead of <>" << endl
                  << "    -d=VAL, --define=VAL           - define condition (for conditional break)" << endl
@@ -460,6 +486,7 @@ int main( int argc, char *argv[])
             ++optIt; // move to next option
         }
         */
+        /*
         else if (*optIt=="-i" || *optIt=="--include-prefix")
         {
             ++optIt; // move to arg
@@ -472,6 +499,7 @@ int main( int argc, char *argv[])
             incPathPrefix = *optIt;
             ++optIt; // move to next option
         }
+        */
         else if (*optIt=="-d" || *optIt=="--define")
         {
             ++optIt; // move to arg
@@ -544,7 +572,7 @@ int main( int argc, char *argv[])
         }
     }
 
-    incPathPrefix = appendPathSep(incPathPrefix);
+    //incPathPrefix = appendPathSep(incPathPrefix);
 
     std::vector< std::string >                     namesOrder;
     std::set<std::string>                          usedNames;
@@ -612,6 +640,7 @@ int main( int argc, char *argv[])
 
         std::string guardString = makeGuard( namespaceGuardName, typeName, incName );
 
+        /*
         char openQuot  = '<';
         char closeQuot = '>';
 
@@ -620,6 +649,7 @@ int main( int argc, char *argv[])
             openQuot  = '\"';
             closeQuot = '\"';
         }
+        */
 
         if (cleanMode)
         {
@@ -661,7 +691,11 @@ int main( int argc, char *argv[])
                 ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
             }
 
-            ofs << "    " << "#include " << openQuot << incPathPrefix << *itInc << closeQuot << endl;
+            std::string incName = *itInc;
+            if (!isIncludeQuoted(*itInc))
+                incName = quoteInclude( *itInc, includeModeUser );
+
+            ofs << "    " << "#include " << incName << endl;
             ofs << endl;
         }
 
