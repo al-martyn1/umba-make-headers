@@ -102,6 +102,7 @@ bool readNamelists( const std::string                              &namelistName
                   , std::vector< std::string >                     &namesOrder
                   , std::set<std::string>                          &usedNames
                   , std::map< std::string, std::set<std::string> > &names
+                  , const std::set<std::string>                    &defines
                   )
 {
     using std::cout;
@@ -137,10 +138,27 @@ bool readNamelists( const std::string                              &namelistName
             std::string kwd, name;
 
             iss >> kwd;
-            iss >> name;
 
             if (kwd=="#break")
                 return true;
+
+            iss >> name;
+
+
+            if (kwd=="#break_ifdef")
+            {
+                std::set<std::string>::const_iterator it = defines.find(name);
+                if (it!=defines.end())
+                    return true;
+            }
+
+            if (kwd=="#break_ifndef")
+            {
+                std::set<std::string>::const_iterator it = defines.find(name);
+                if (it==defines.end())
+                    return true;
+            }
+
 
             if (kwd!="#include")
                 continue;
@@ -155,7 +173,7 @@ bool readNamelists( const std::string                              &namelistName
 
             std::string includedFullName = appendPath( curPath, name );
 
-            if ( !readNamelists( includedFullName, namesOrder, usedNames, names ))
+            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, defines ))
                return false;
 
             continue;
@@ -230,6 +248,10 @@ int main( int argc, char *argv[])
     bool        includeModeUser = false;
     bool        cleanMode       = false;
 
+    std::set< std::string>      defines;
+
+
+
     std::vector< std::string > opts;
 
     for(int argN=1; argN!=argc; ++argN)
@@ -264,6 +286,7 @@ int main( int argc, char *argv[])
                  << "    -i=val, --include-prefix=val   - include prefix (path)" << endl
                  << "    -c, --clean                    - clean generated files" << endl
                  << "    -u, --user-include[s]          - user quotes instead of <>" << endl
+                 << "    -d, --define                   - define condition (for conditional break)" << endl
                  << "'=' sign can be ommited" << endl
                  << "" << endl
                  << "If namelist.txt file name is ommited, default file name 'namelist.txt' without path is used" << endl
@@ -300,6 +323,18 @@ int main( int argc, char *argv[])
             incPathPrefix = *optIt;
             ++optIt;
         }
+        else if (opt=="-d" || opt=="--define")
+        {
+            ++optIt;
+            if ( optIt==opts.end() )
+            {
+                cout << "-d/--define - missing argument" << endl;
+                return 1;
+            }
+
+            defines.insert(*optIt);
+            ++optIt;
+        }
         else if (opt=="-u" || opt=="--user-include" || opt=="--user-includes")
         {
             ++optIt; // -u, --user-include[s]
@@ -334,70 +369,14 @@ int main( int argc, char *argv[])
     std::set<std::string>                          usedNames;
     std::map< std::string, std::set<std::string> > names; // map names to its includes
 
-    // cout << "Namespace: " << nameSpace << endl << endl;
-
-    //<<<
-    #if 0
-    std::ifstream istrteamNamelist(namelistName.c_str());
-
-    if (!istrteamNamelist)
-    {
-        cerr << "Failed to open input namelist file '" << namelistName << "'" << endl;
-        return 2;
-    }
-
-    std::string typeInfoStr;
 
 
-    while( std::getline(istrteamNamelist, typeInfoStr ) )
-    {
-
-        if (typeInfoStr.empty())
-            continue;
-
-        if (isEmpty(typeInfoStr))
-            continue;
-
-        if (typeInfoStr[0]=='#' || typeInfoStr[0]==';')
-            continue;
-
-        std::istringstream iss(typeInfoStr);
-
-        std::string typeName;
-        iss >> typeName;
-
-        if (usedNames.find(typeName)!=usedNames.end())
-            continue;
-
-        usedNames.insert(typeName);
-        namesOrder.push_back(typeName);
-
-        // !!! namesOrder
-
-        std::string tmpName;
-
-        while(iss>>tmpName)
-        {
-            if (tmpName.empty())
-                continue;
-
-            if (tmpName[0]=='#' || tmpName[0]==';')
-                break;
-
-            names[typeName].insert(tmpName);
-        }
-    }
-
-    #endif
-    //>>>
-
-    if (!readNamelists( namelistName, namesOrder, usedNames, names ))
+    if (!readNamelists( namelistName, namesOrder, usedNames, names, defines ))
         return 2;
 
 
     unsigned totalFilesGenerated = 0;
 
-    //std::set<std::string> lastIncludes;
 
     std::vector< std::string >::const_iterator nameIt = namesOrder.begin();
 
@@ -413,13 +392,11 @@ int main( int argc, char *argv[])
         std::map< std::string, std::set<std::string> >::const_iterator nit = names.find(typeName);
         if (nit==names.end() || nit->second.empty())
         {
-            //includesSet = lastIncludes;
             cout << "Name '" << typeName << "' found in order list, but not found in set" << endl;
         }
         else
         {
             includesSet  = nit->second;
-            //lastIncludes = includesSet;
         }
 
         // !!!
@@ -506,81 +483,6 @@ int main( int argc, char *argv[])
     else
         cout << "Total files generated: " << totalFilesGenerated << endl;
 
-
-    #if 0
-
-    std::map< std::string, std::set<std::string> >::const_iterator nit = names.begin();
-    for(; nit != names.end(); ++nit)
-    {
-
-        std::string typeName = nit->first; // *nit->second.begin();
-
-        const std::set<std::string> &incSet = nit->second;
-
-        std::string incName; // = *nit->second.begin();
-        std::ostringstream ossGuard;
-
-        ossGuard << "GENERATED_";
-
-        if (!nameSpace.empty())
-            ossGuard << nameSpace << "_";
-
-        ossGuard << typeName;
-
-        if (!nit->second.empty())
-        {
-            incName = *nit->second.begin();
-            ossGuard << "_from_" << incName;
-        }
-
-        ossGuard << "_INCLUDE_GUARD";
-
-        std::string guard = ossGuard.str();
-
-        char openQuot  = '<';
-        char closeQuot = '>';
-
-        if (includeModeUser)
-        {
-            openQuot  = '\"';
-            closeQuot = '\"';
-        }
-
-
-        std::ofstream ofs( typeName.c_str() ); //  ( nit->first.c_str());
-
-        ofs << "#pragma once" << endl << endl;
-
-        ofs << "#if !defined(" << guard << ")" << endl << endl;
-        ofs << "    #define " << guard << endl << endl;
-
-        if (nameSpace=="std" && !incName.empty())
-        {
-            ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl << endl;
-        }
-
-        // https://en.cppreference.com/w/cpp/string/basic_string
-        // https://en.cppreference.com/w/cpp/header/any
-
-        std::set<std::string>::const_iterator itInc = incSet.begin();
-        for(; itInc!=incSet.end(); ++itInc)
-        {
-            if (nameSpace=="std")
-            {
-                ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
-            }
-
-            ofs << "    " << "#include " << openQuot << incPathPrefix << *itInc << closeQuot << endl;
-        }
-
-        ofs << endl;
-        //cout << endl;
-         
-        ofs << "#endif /* " << guard << " */" << endl << endl;
-
-    }
-
-    #endif
 
     return 0;
 }
