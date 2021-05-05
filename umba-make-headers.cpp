@@ -502,12 +502,6 @@ int main( int argc, char *argv[])
         if (typeName.empty())
             continue;
 
-        if (warningFlags.warnUppercase && isFullUppercase(typeName))
-        {
-            cout<<"Warning: pissible macro: '" << typeName << "'" << endl;
-        }
-        
-
 
         std::set<std::string> includesSet;
 
@@ -521,7 +515,18 @@ int main( int argc, char *argv[])
             includesSet  = nit->second;
         }
 
-        // !!!
+
+        if (warningFlags.warnUppercase && isFullUppercase(typeName))
+        {
+            cout<<"Warning: pissible macro: '" << typeName << "'" << endl;
+            std::set<std::string>::const_iterator itInc = includesSet.begin();
+            for(; itInc!=includesSet.end(); ++itInc)
+            {
+                cout << "    in: " << *itInc << endl;
+            }
+        }
+        
+
 
         if (includesSet.size()>1 && !cleanMode && warningFlags.warnMultipleIncludes)
         {
