@@ -31,3 +31,4 @@
 *.out
 *.app
 /deploy.bat
+/make.log

@@ -8,6 +8,50 @@
 #include <cstdio>
 
 //----------------------------------------------------------------------------
+struct WarningFlags
+{
+
+    bool     warnMultipleIncludes;
+    bool     warnUppercase;
+
+
+    static WarningFlags wf_all()
+    {
+        WarningFlags of;
+
+        of.warnMultipleIncludes    = true;
+        of.warnUppercase           = true;
+
+        return of;
+    }
+
+    static WarningFlags wf_default()
+    {
+        WarningFlags of;
+
+        of.warnMultipleIncludes    = false;
+        of.warnUppercase           = false;
+
+        return of;
+    }
+
+    static WarningFlags wf_none()
+    {
+        WarningFlags of;
+
+        of.warnMultipleIncludes    = false;
+        of.warnUppercase           = false;
+
+        return of;
+    }
+
+};
+
+
+
+
+
+//----------------------------------------------------------------------------
 inline
 bool isEmpty( const std::string &str )
 {
@@ -91,6 +135,27 @@ std::string appendPathSep( std::string p )
 
 //----------------------------------------------------------------------------
 inline
+bool isFullUppercase( const std::string &str )
+{
+    std::string::size_type i = 0, sz = str.size();
+
+    for(; i!=sz; ++i)
+    {
+        if (str[i]=='_')
+            continue;
+
+        if (str[i]>='A' && str[i]<='Z')
+            continue;
+
+        return false;
+    }
+
+    return true;
+
+}
+
+//----------------------------------------------------------------------------
+inline
 std::string appendPath( const std::string &p, const std::string &n )
 {
     return appendPathSep(p) + n;
@@ -103,6 +168,7 @@ bool readNamelists( const std::string                              &namelistName
                   , std::set<std::string>                          &usedNames
                   , std::map< std::string, std::set<std::string> > &names
                   , const std::set<std::string>                    &defines
+                  , const WarningFlags                             &warningFlags
                   )
 {
     using std::cout;
@@ -173,7 +239,7 @@ bool readNamelists( const std::string                              &namelistName
 
             std::string includedFullName = appendPath( curPath, name );
 
-            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, defines ))
+            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, defines, warningFlags ))
                return false;
 
             continue;
@@ -235,7 +301,12 @@ bool readNamelists( const std::string                              &namelistName
     return true;
 }
 
+//----------------------------------------------------------------------------
 
+
+
+
+//----------------------------------------------------------------------------
 int main( int argc, char *argv[])
 {
     using std::cout;
@@ -249,6 +320,8 @@ int main( int argc, char *argv[])
     bool        cleanMode       = false;
 
     std::set< std::string>      defines;
+
+    WarningFlags                warningFlags = WarningFlags::wf_default();
 
 
 
@@ -275,8 +348,8 @@ int main( int argc, char *argv[])
 
     while( optIt!=opts.end() )
     {
-        const std::string &opt = *optIt;
-        if (opt=="-h" || opt=="--help")
+        //const std::string &opt = *optIt;
+        if (*optIt=="-h" || *optIt=="--help")
         {
             cout << "Usage: umba-make-headers [options] [namelist.txt]" << endl
                  << "where options are: " << endl
@@ -286,7 +359,17 @@ int main( int argc, char *argv[])
                  << "    -i=val, --include-prefix=val   - include prefix (path)" << endl
                  << "    -c, --clean                    - clean generated files" << endl
                  << "    -u, --user-include[s]          - user quotes instead of <>" << endl
-                 << "    -d, --define                   - define condition (for conditional break)" << endl
+                 << "    -d=VAL, --define=VAL           - define condition (for conditional break)" << endl
+                 << "    -W=warn-opt, --warn=warn-      - turn warnings on/off" << endl
+                 << "       warn-opt:" << endl
+                 << "           all        - turn all warnings on" << endl
+                 << "           off        - turn all warnings off" << endl
+                 << "           default    - turn all warnings to its default state" << endl
+                 << "           multi      - turn 'multiple includes' warning on" << endl
+                 << "           no-multi   - turn 'multiple includes' warning off" << endl
+                 << "           macro      - turn 'macro detected' warning on" << endl
+                 << "           no-macro   - turn 'macro detected' warning off" << endl
+
                  << "'=' sign can be ommited" << endl
                  << "" << endl
                  << "If namelist.txt file name is ommited, default file name 'namelist.txt' without path is used" << endl
@@ -294,14 +377,14 @@ int main( int argc, char *argv[])
 
             return 1;
         }
-        else if (opt=="-w" || opt=="--where")
+        else if (*optIt=="-w" || *optIt=="--where")
         {
             cout << argv[0] << endl;
             return 1;
         }
-        else if (opt=="-g" || opt=="--guard-prefix")
+        else if (*optIt=="-g" || *optIt=="--guard-prefix")
         {
-            ++optIt;
+            ++optIt; // move to arg
             if ( optIt==opts.end() )
             {
                 cout << "-g/--guard-prefix - missing argument" << endl;
@@ -309,11 +392,11 @@ int main( int argc, char *argv[])
             }
 
             nameSpace = *optIt;
-            ++optIt;
+            ++optIt; // move to next option
         }
-        else if (opt=="-i" || opt=="--include-prefix")
+        else if (*optIt=="-i" || *optIt=="--include-prefix")
         {
-            ++optIt;
+            ++optIt; // move to arg
             if ( optIt==opts.end() )
             {
                 cout << "-i/--include-prefix - missing argument" << endl;
@@ -321,11 +404,11 @@ int main( int argc, char *argv[])
             }
 
             incPathPrefix = *optIt;
-            ++optIt;
+            ++optIt; // move to next option
         }
-        else if (opt=="-d" || opt=="--define")
+        else if (*optIt=="-d" || *optIt=="--define")
         {
-            ++optIt;
+            ++optIt; // move to arg
             if ( optIt==opts.end() )
             {
                 cout << "-d/--define - missing argument" << endl;
@@ -333,16 +416,48 @@ int main( int argc, char *argv[])
             }
 
             defines.insert(*optIt);
-            ++optIt;
+            ++optIt; // move to next option
         }
-        else if (opt=="-u" || opt=="--user-include" || opt=="--user-includes")
+        else if (*optIt=="-W" || *optIt=="--warn")
         {
-            ++optIt; // -u, --user-include[s]
+            ++optIt; // move to arg
+            if ( optIt==opts.end() )
+            {
+                cout << "-W/--warn - missing argument" << endl;
+                return 1;
+            }
+
+            if (*optIt=="all")
+               warningFlags = WarningFlags::wf_all();
+            else if (*optIt=="off")
+               warningFlags = WarningFlags::wf_none();
+            else if (*optIt=="default")
+               warningFlags = WarningFlags::wf_default();
+            else if (*optIt=="multi")
+               warningFlags.warnMultipleIncludes = true;
+            else if (*optIt=="no-multi")
+               warningFlags.warnMultipleIncludes = false;
+            else if (*optIt=="macro")
+               warningFlags.warnUppercase        = true;
+            else if (*optIt=="no-macro")
+               warningFlags.warnUppercase        = false;
+            else
+            {
+                cout << "Unknown -W/--warn option value: " << *optIt << endl;
+                return 1;
+            }
+
+            ++optIt; // move to next option
+
+        }
+        else if (*optIt=="-u" || *optIt=="--user-include" || *optIt=="--user-includes")
+        {
+            ++optIt; // move to next option
             includeModeUser = true;
         }
-        else if (opt=="-c" || opt=="--clean")
+        else if (*optIt=="-c" || *optIt=="--clean")
         {
-            ++optIt; // -u, --user-include[s]
+            ++optIt; // move to next option
             cleanMode = true;
         }
         /*
@@ -358,8 +473,8 @@ int main( int argc, char *argv[])
         */
         else 
         {
-            namelistName = correctPathSeparators(opt);
-            ++optIt;
+            namelistName = correctPathSeparators(*optIt);
+            ++optIt; // move to next option
         }
     }
 
@@ -371,7 +486,7 @@ int main( int argc, char *argv[])
 
 
 
-    if (!readNamelists( namelistName, namesOrder, usedNames, names, defines ))
+    if (!readNamelists( namelistName, namesOrder, usedNames, names, defines, warningFlags ))
         return 2;
 
 
@@ -387,6 +502,13 @@ int main( int argc, char *argv[])
         if (typeName.empty())
             continue;
 
+        if (warningFlags.warnUppercase && isFullUppercase(typeName))
+        {
+            cout<<"Warning: pissible macro: '" << typeName << "'" << endl;
+        }
+        
+
+
         std::set<std::string> includesSet;
 
         std::map< std::string, std::set<std::string> >::const_iterator nit = names.find(typeName);
@@ -401,7 +523,7 @@ int main( int argc, char *argv[])
 
         // !!!
 
-        if (includesSet.size()>1 && !cleanMode)
+        if (includesSet.size()>1 && !cleanMode && warningFlags.warnMultipleIncludes)
         {
             cout << "Too many includes for: " << typeName << endl;
             for( std::set<std::string>::const_iterator it=includesSet.begin(); it!=includesSet.end(); ++it )
