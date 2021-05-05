@@ -421,6 +421,14 @@ int main( int argc, char *argv[])
 
         // !!!
 
+        if (includesSet.size()>1 && !cleanMode)
+        {
+            cout << "Too many includes for: " << typeName << endl;
+            for( std::set<std::string>::const_iterator it=includesSet.begin(); it!=includesSet.end(); ++it )
+                cout << "    " << *it << endl;
+        }
+
+
         std::string incName;
 
         if (!includesSet.empty())
