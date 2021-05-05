@@ -589,6 +589,8 @@ int main( int argc, char *argv[])
 
     unsigned totalFilesGenerated = 0;
 
+    std::ofstream gitAdd( "git-add.bat" );
+
 
     std::vector< std::string >::const_iterator nameIt = namesOrder.begin();
 
@@ -659,6 +661,8 @@ int main( int argc, char *argv[])
         }
 
 
+        gitAdd << "git add " << typeName << endl;
+
         std::ofstream ofs( typeName.c_str() ); //  ( nit->first.c_str());
 
         if (!ofs)
@@ -697,6 +701,7 @@ int main( int argc, char *argv[])
 
             ofs << "    " << "#include " << incName << endl;
             ofs << endl;
+
         }
 
         ofs << endl;
