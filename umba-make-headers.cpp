@@ -111,6 +111,61 @@ std::string correctPathSeparators( std::string path )
 
 //----------------------------------------------------------------------------
 inline
+std::string removeDupChars( const std::string &s )
+{
+    std::string res; res.reserve(s.size());
+
+    char prevChar = 0;
+
+    std::string::size_type i = 0, sz = s.size();
+
+    for(; i!=sz; ++i)
+    {
+        char ch = s[i];
+        if (ch==prevChar)
+            continue;
+
+        res.append(1,ch);
+
+        prevChar = ch;
+    }
+
+    // std::cout << "removeDupChars: " << res << std::endl;
+
+    return res;
+}
+
+//----------------------------------------------------------------------------
+inline
+std::string makeGuardFromNamespace( std::string ns )
+{
+    ns = removeDupChars(ns);
+
+    //std::string res; res.reserve(ns.size());
+
+    std::string::size_type i = 0, sz = ns.size();
+
+    for(; i!=sz; ++i)
+    {
+        if (ns[i]=='_' || (ns[i]>='A' && ns[i]<='Z') || (ns[i]>='a' && ns[i]<='z'))
+        {
+            //res.append(1,ns[i]);
+            //ns[i]
+            continue;
+        }
+        else
+        {
+            ns[i] = '_';
+        }
+    }
+
+    // std::cout << "makeGuardFromNamespace: " << ns << std::endl;
+
+    return ns;    
+}
+
+//----------------------------------------------------------------------------
+inline
 std::string getPath( std::string p )
 {
     p = correctPathSeparators(p);
@@ -167,6 +222,7 @@ bool readNamelists( const std::string                              &namelistName
                   , std::vector< std::string >                     &namesOrder
                   , std::set<std::string>                          &usedNames
                   , std::map< std::string, std::set<std::string> > &names
+                  , std::string                                    &namespaceName
                   , const std::set<std::string>                    &defines
                   , const WarningFlags                             &warningFlags
                   )
@@ -225,6 +281,13 @@ bool readNamelists( const std::string                              &namelistName
                     return true;
             }
 
+            if (kwd=="#namespace")
+            {
+                namespaceName = name;
+                continue;
+            }
+            
+
 
             if (kwd!="#include")
                 continue;
@@ -239,7 +302,7 @@ bool readNamelists( const std::string                              &namelistName
 
             std::string includedFullName = appendPath( curPath, name );
 
-            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, defines, warningFlags ))
+            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, namespaceName, defines, warningFlags ))
                return false;
 
             continue;
@@ -313,7 +376,8 @@ int main( int argc, char *argv[])
     using std::cerr;
     using std::endl;
 
-    std::string nameSpace;
+    std::string namespaceName;
+    std::string namespaceGuardName;
     std::string incPathPrefix;
     std::string namelistName = "namelist.txt";
     bool        includeModeUser = false;
@@ -355,7 +419,7 @@ int main( int argc, char *argv[])
                  << "where options are: " << endl
                  << "    -h, --help                     - print this help and exit" << endl
                  << "    -w, --where                    - print full path to self executable" << endl
-                 << "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl
+                 /*<< "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl */
                  << "    -i=val, --include-prefix=val   - include prefix (path)" << endl
                  << "    -c, --clean                    - clean generated files" << endl
                  << "    -u, --user-include[s]          - user quotes instead of <>" << endl
@@ -382,6 +446,7 @@ int main( int argc, char *argv[])
             cout << argv[0] << endl;
             return 1;
         }
+        /*
         else if (*optIt=="-g" || *optIt=="--guard-prefix")
         {
             ++optIt; // move to arg
@@ -394,6 +459,7 @@ int main( int argc, char *argv[])
             nameSpace = *optIt;
             ++optIt; // move to next option
         }
+        */
         else if (*optIt=="-i" || *optIt=="--include-prefix")
         {
             ++optIt; // move to arg
@@ -486,8 +552,11 @@ int main( int argc, char *argv[])
 
 
 
-    if (!readNamelists( namelistName, namesOrder, usedNames, names, defines, warningFlags ))
+    if (!readNamelists( namelistName, namesOrder, usedNames, names, namespaceName, defines, warningFlags ))
         return 2;
+
+
+    namespaceGuardName = makeGuardFromNamespace(namespaceName);
 
 
     unsigned totalFilesGenerated = 0;
@@ -541,7 +610,7 @@ int main( int argc, char *argv[])
         if (!includesSet.empty())
             incName = *includesSet.begin();
 
-        std::string guardString = makeGuard( nameSpace, typeName, incName );
+        std::string guardString = makeGuard( namespaceGuardName, typeName, incName );
 
         char openQuot  = '<';
         char closeQuot = '>';
@@ -574,7 +643,7 @@ int main( int argc, char *argv[])
         ofs << "#if !defined(" << guardString << ")" << endl << endl;
         ofs << "    #define " << guardString << endl << endl;
 
-        if (nameSpace=="std" && !incName.empty())
+        if (namespaceName=="std" && !incName.empty())
         {
             ofs << endl;
             ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl << endl;
@@ -587,7 +656,7 @@ int main( int argc, char *argv[])
         std::set<std::string>::const_iterator itInc = includesSet.begin();
         for(; itInc!=includesSet.end(); ++itInc)
         {
-            if (nameSpace=="std")
+            if (namespaceName=="std")
             {
                 ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
             }
