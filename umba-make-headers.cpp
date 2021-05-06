@@ -48,6 +48,13 @@ struct WarningFlags
 };
 
 
+struct InputFileOptions
+{
+    std::string         namespaceName;
+    std::string         qtModule;
+};
+
+
 
 
 
@@ -147,7 +154,7 @@ std::string makeGuardFromNamespace( std::string ns )
 
     for(; i!=sz; ++i)
     {
-        if (ns[i]=='_' || (ns[i]>='A' && ns[i]<='Z') || (ns[i]>='a' && ns[i]<='z'))
+        if (ns[i]=='_' || (ns[i]>='A' && ns[i]<='Z') || (ns[i]>='a' && ns[i]<='z') || (ns[i]>='0' && ns[i]<='9'))
         {
             //res.append(1,ns[i]);
             //ns[i]
@@ -248,7 +255,8 @@ bool readNamelists( const std::string                              &namelistName
                   , std::vector< std::string >                     &namesOrder
                   , std::set<std::string>                          &usedNames
                   , std::map< std::string, std::set<std::string> > &names
-                  , std::string                                    &namespaceName
+                  , InputFileOptions                               &inputFileOptions
+                  , std::map< std::string, std::string >           &qtModules
                   , const std::set<std::string>                    &defines
                   , const WarningFlags                             &warningFlags
                   )
@@ -309,10 +317,15 @@ bool readNamelists( const std::string                              &namelistName
 
             if (kwd=="#namespace")
             {
-                namespaceName = name;
+                inputFileOptions.namespaceName = name;
                 continue;
             }
-            
+
+            if (kwd=="#qt_module")
+            {
+                inputFileOptions.qtModule = name;
+                continue;
+            }
 
 
             if (kwd!="#include")
@@ -328,7 +341,7 @@ bool readNamelists( const std::string                              &namelistName
 
             std::string includedFullName = appendPath( curPath, name );
 
-            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, namespaceName, defines, warningFlags ))
+            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, inputFileOptions, qtModules, defines, warningFlags ))
                return false;
 
             continue;
@@ -376,6 +389,8 @@ bool readNamelists( const std::string                              &namelistName
 
         names[typeName].insert( curIncludes.begin(), curIncludes.end() );
 
+        qtModules[typeName] = inputFileOptions.qtModule;
+
         /*
         if (typeName=="swap")
         {
@@ -402,12 +417,17 @@ int main( int argc, char *argv[])
     using std::cerr;
     using std::endl;
 
+
+    InputFileOptions    inputFileOptions;
+
     std::string namespaceName;
     std::string namespaceGuardName;
     //std::string incPathPrefix;
     std::string namelistName = "namelist.txt";
     bool        includeModeUser = false;
     bool        cleanMode       = false;
+
+    std::map< std::string, std::string > qtModules;
 
     std::set< std::string>      defines;
 
@@ -580,11 +600,11 @@ int main( int argc, char *argv[])
 
 
 
-    if (!readNamelists( namelistName, namesOrder, usedNames, names, namespaceName, defines, warningFlags ))
+    if (!readNamelists( namelistName, namesOrder, usedNames, names, inputFileOptions, qtModules, defines, warningFlags ))
         return 2;
 
 
-    namespaceGuardName = makeGuardFromNamespace(namespaceName);
+    namespaceGuardName = makeGuardFromNamespace(inputFileOptions.namespaceName);
 
 
     unsigned totalFilesGenerated = 0;
@@ -640,18 +660,16 @@ int main( int argc, char *argv[])
         if (!includesSet.empty())
             incName = *includesSet.begin();
 
-        std::string guardString = makeGuard( namespaceGuardName, typeName, incName );
+        std::map< std::string, std::string >::const_iterator qtModIt = qtModules.find( typeName );
 
-        /*
-        char openQuot  = '<';
-        char closeQuot = '>';
+        std::string guardIncName = incName;
 
-        if (includeModeUser)
-        {
-            openQuot  = '\"';
-            closeQuot = '\"';
-        }
-        */
+        if ( qtModIt!=qtModules.end() )
+            guardIncName = makeGuardFromNamespace( appendPath( qtModIt->second, incName ) );
+
+
+        std::string guardString = makeGuard( namespaceGuardName, typeName, guardIncName );
+
 
         if (cleanMode)
         {
@@ -687,26 +705,64 @@ int main( int argc, char *argv[])
         // https://en.cppreference.com/w/cpp/string/basic_string
         // https://en.cppreference.com/w/cpp/header/any
 
-        std::set<std::string>::const_iterator itInc = includesSet.begin();
-        for(; itInc!=includesSet.end(); ++itInc)
-        {
-            if (namespaceName=="std")
-            {
-                ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
-            }
-
-            std::string incName = *itInc;
-            if (!isIncludeQuoted(*itInc))
-                incName = quoteInclude( *itInc, includeModeUser );
-
-            ofs << "    " << "#include " << incName << endl;
-            ofs << endl;
-
-        }
 
         ofs << endl;
         //cout << endl;
-         
+
+        // std::map< std::string, std::string >::const_iterator qtModIt = qtModules.find( typeName );
+
+        if ( qtModIt!=qtModules.end() )
+        {
+            const std::string &qtModule = qtModIt->second;
+
+            std::set<std::string>::const_iterator itInc = includesSet.begin();
+            for(; itInc!=includesSet.end(); ++itInc)
+            {
+                std::string incName = appendPath( qtModule, *itInc );
+
+                incName = quoteInclude( incName, includeModeUser );
+
+                ofs << "    " << "#include " << incName << endl;
+                ofs << endl;
+            }
+           
+            ofs << endl;
+            ofs << "    #if defined(_MSC_VER)" << endl << endl;
+
+            ofs << "        #if defined(DEBUG) || defined(_DEBUG)" << endl << endl
+                << "            #pragma comment(lib, \"" << qtModule << "d\")" << endl << endl
+                << "        #else" << endl << endl
+                << "            #pragma comment(lib, \"" << qtModule << "\")" << endl << endl
+                << "        #endif" << endl << endl
+                ;
+
+            ofs << "    #endif /* _MSC_VER */" << endl << endl;
+        }
+        else
+        {
+            std::set<std::string>::const_iterator itInc = includesSet.begin();
+            for(; itInc!=includesSet.end(); ++itInc)
+            {
+
+                if (namespaceName=="std")
+                {
+                    ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
+                }
+           
+                std::string incName = *itInc;
+                if (!isIncludeQuoted(*itInc))
+                    incName = quoteInclude( *itInc, includeModeUser );
+
+                ofs << "    " << "#include " << incName << endl;
+                ofs << endl;
+           
+            }
+           
+            ofs << endl;
+        
+        }
+
+
         ofs << "#endif /* " << guardString << " */" << endl << endl;
 
         ++totalFilesGenerated;
