@@ -6,6 +6,8 @@
 #include <map>
 #include <set>
 #include <cstdio>
+#include <sstream>
+
 
 //----------------------------------------------------------------------------
 struct WarningFlags
@@ -426,6 +428,7 @@ int main( int argc, char *argv[])
     std::string namelistName = "namelist.txt";
     bool        includeModeUser = false;
     bool        cleanMode       = false;
+    bool        generateGitAdd  = false;
 
     std::map< std::string, std::string > qtModules;
 
@@ -465,6 +468,7 @@ int main( int argc, char *argv[])
                  << "where options are: " << endl
                  << "    -h, --help                     - print this help and exit" << endl
                  << "    -w, --where                    - print full path to self executable" << endl
+                 << "    -g, --git-add                  - turns on 'git-add.bat' file generation" << endl
                  /*<< "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl */
                  /*<< "    -i=val, --include-prefix=val   - include prefix (path)" << endl */
                  << "    -c, --clean                    - clean generated files" << endl
@@ -491,6 +495,11 @@ int main( int argc, char *argv[])
         {
             cout << argv[0] << endl;
             return 1;
+        }
+        else if (*optIt=="-g" || *optIt=="--git-add")
+        {
+            ++optIt; // move to next option
+            generateGitAdd = true;
         }
         /*
         else if (*optIt=="-g" || *optIt=="--guard-prefix")
@@ -609,7 +618,8 @@ int main( int argc, char *argv[])
 
     unsigned totalFilesGenerated = 0;
 
-    std::ofstream gitAdd( "git-add.bat" );
+
+    std::ostringstream gitAdd;
 
 
     std::vector< std::string >::const_iterator nameIt = namesOrder.begin();
@@ -770,9 +780,20 @@ int main( int argc, char *argv[])
     }
 
     if (cleanMode)
+    {
         cout << "Total files removed: " << totalFilesGenerated << endl;
+    }
     else
+    {
         cout << "Total files generated: " << totalFilesGenerated << endl;
+
+        if (generateGitAdd)
+        {
+            std::ofstream gitAddFile( "git-add.bat" );
+
+            gitAddFile << gitAdd.str() << endl;
+        }
+    }
 
 
     return 0;
