@@ -146,6 +146,28 @@ std::string removeDupChars( const std::string &s )
 
 //----------------------------------------------------------------------------
 inline
+std::string makeLowerString( std::string s )
+{
+    std::string::size_type i = 0, sz = s.size();
+
+    for(; i!=sz; ++i)
+    {
+        if (s[i]>='A' && s[i]<='Z')
+        {
+            s[i] = (char)(s[i]-'A' + 'a');
+        }
+        else
+        {
+            continue;
+        }
+    }
+
+    return s;
+
+}
+
+//----------------------------------------------------------------------------
+inline
 std::string makeGuardFromNamespace( std::string ns )
 {
     ns = removeDupChars(ns);
@@ -707,8 +729,8 @@ int main( int argc, char *argv[])
 
         if (namespaceName=="std" && !incName.empty())
         {
-            ofs << endl;
-            ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl << endl;
+            //ofs << endl;
+            ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl;
             ofs << endl;
         }
 
@@ -716,13 +738,19 @@ int main( int argc, char *argv[])
         // https://en.cppreference.com/w/cpp/header/any
 
 
-        ofs << endl;
+        //ofs << endl;
         //cout << endl;
 
         // std::map< std::string, std::string >::const_iterator qtModIt = qtModules.find( typeName );
 
         if ( qtModIt!=qtModules.end() )
         {
+            // https://doc.qt.io/qt-5/qnetworkrequest.html
+            // makeLowerString( std::string s )
+
+            ofs << "    " << "// " << "https://doc.qt.io/qt-5/" << makeLowerString(typeName) << ".html" << endl;
+            ofs << endl;
+
             const std::string &qtModule = qtModIt->second;
 
             std::set<std::string>::const_iterator itInc = includesSet.begin();
@@ -736,7 +764,7 @@ int main( int argc, char *argv[])
                 ofs << endl;
             }
            
-            ofs << endl;
+            //ofs << endl;
             ofs << "    #if defined(_MSC_VER)" << endl << endl;
 
             ofs << "        #if defined(DEBUG) || defined(_DEBUG)" << endl << endl
@@ -746,7 +774,8 @@ int main( int argc, char *argv[])
                 << "        #endif" << endl << endl
                 ;
 
-            ofs << "    #endif /* _MSC_VER */" << endl << endl;
+            ofs << "    #endif /* _MSC_VER */" << endl;
+            ofs << endl;
         }
         else
         {
