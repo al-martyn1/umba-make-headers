@@ -413,7 +413,8 @@ bool readNamelists( const std::string                              &namelistName
 
         names[typeName].insert( curIncludes.begin(), curIncludes.end() );
 
-        qtModules[typeName] = inputFileOptions.qtModule;
+        if (!inputFileOptions.qtModule.empty())
+            qtModules[typeName] = inputFileOptions.qtModule;
 
         /*
         if (typeName=="swap")
@@ -444,7 +445,7 @@ int main( int argc, char *argv[])
 
     InputFileOptions    inputFileOptions;
 
-    std::string namespaceName;
+    //std::string namespaceName;
     std::string namespaceGuardName;
     //std::string incPathPrefix;
     std::string namelistName = "namelist.txt";
@@ -669,7 +670,7 @@ int main( int argc, char *argv[])
 
         if (warningFlags.warnUppercase && isFullUppercase(typeName))
         {
-            cout<<"Warning: pissible macro: '" << typeName << "'" << endl;
+            cout<<"Warning: possible macro: '" << typeName << "'" << endl;
             std::set<std::string>::const_iterator itInc = includesSet.begin();
             for(; itInc!=includesSet.end(); ++itInc)
             {
@@ -727,15 +728,25 @@ int main( int argc, char *argv[])
         ofs << "#if !defined(" << guardString << ")" << endl << endl;
         ofs << "    #define " << guardString << endl << endl;
 
-        if (namespaceName=="std" && !incName.empty())
-        {
-            //ofs << endl;
-            ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl;
-            ofs << endl;
-        }
-
         // https://en.cppreference.com/w/cpp/string/basic_string
         // https://en.cppreference.com/w/cpp/header/any
+
+
+        if (inputFileOptions.namespaceName=="std")
+        {
+            if (!incName.empty())
+            {
+                //ofs << endl;
+                ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/" << incName << "/" << typeName << endl;
+                ofs << endl;
+            }
+        }
+
+        else if ( qtModIt!=qtModules.end() )
+        {
+            ofs << "    " << "// " << "https://doc.qt.io/qt-5/" << makeLowerString(typeName) << ".html" << endl;
+            ofs << endl;
+        }
 
 
         //ofs << endl;
@@ -745,11 +756,6 @@ int main( int argc, char *argv[])
 
         if ( qtModIt!=qtModules.end() )
         {
-            // https://doc.qt.io/qt-5/qnetworkrequest.html
-            // makeLowerString( std::string s )
-
-            ofs << "    " << "// " << "https://doc.qt.io/qt-5/" << makeLowerString(typeName) << ".html" << endl;
-            ofs << endl;
 
             const std::string &qtModule = qtModIt->second;
 
@@ -765,17 +771,6 @@ int main( int argc, char *argv[])
             }
            
             //ofs << endl;
-            ofs << "    #if defined(_MSC_VER)" << endl << endl;
-
-            ofs << "        #if defined(DEBUG) || defined(_DEBUG)" << endl << endl
-                << "            #pragma comment(lib, \"" << qtModule << "d\")" << endl << endl
-                << "        #else" << endl << endl
-                << "            #pragma comment(lib, \"" << qtModule << "\")" << endl << endl
-                << "        #endif" << endl << endl
-                ;
-
-            ofs << "    #endif /* _MSC_VER */" << endl;
-            ofs << endl;
         }
         else
         {
@@ -783,7 +778,7 @@ int main( int argc, char *argv[])
             for(; itInc!=includesSet.end(); ++itInc)
             {
 
-                if (namespaceName=="std")
+                if (inputFileOptions.namespaceName=="std")
                 {
                     ofs << "    " << "// " << "https://en.cppreference.com/w/cpp/header/" << *itInc << endl;
                 }
@@ -800,6 +795,24 @@ int main( int argc, char *argv[])
             ofs << endl;
         
         }
+
+        if ( qtModIt!=qtModules.end() )
+        {
+            const std::string &qtModule = qtModIt->second;
+
+            ofs << "    #if defined(_MSC_VER)" << endl << endl;
+
+            ofs << "        #if defined(DEBUG) || defined(_DEBUG)" << endl << endl
+                << "            #pragma comment(lib, \"" << qtModule << "d\")" << endl << endl
+                << "        #else" << endl << endl
+                << "            #pragma comment(lib, \"" << qtModule << "\")" << endl << endl
+                << "        #endif" << endl << endl
+                ;
+
+            ofs << "    #endif /* _MSC_VER */" << endl;
+            ofs << endl;
+        }
+
 
 
         ofs << "#endif /* " << guardString << " */" << endl << endl;
