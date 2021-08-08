@@ -54,6 +54,7 @@ struct InputFileOptions
 {
     std::string         namespaceName;
     std::string         qtModule;
+    std::string         qtModulePath;
 };
 
 
@@ -244,7 +245,27 @@ bool isFullUppercase( const std::string &str )
 inline
 std::string appendPath( const std::string &p, const std::string &n )
 {
+    if (p.empty())
+        return n;
+
     return appendPathSep(p) + n;
+}
+
+//----------------------------------------------------------------------------
+// https://ideone.com/OpPkiu
+inline
+std::string unquote( const std::string &s, char qLeft, char qRight = 0 )
+{
+    if (s.size()<2)
+        return s;
+
+    if (qRight==0)
+        qRight = qLeft;
+
+    if (s[0]!=qLeft || s[s.size()-1]!=qRight)
+        return s;
+
+    return std::string( s, 1, s.size()-2 );
 }
 
 //----------------------------------------------------------------------------
@@ -281,6 +302,7 @@ bool readNamelists( const std::string                              &namelistName
                   , std::map< std::string, std::set<std::string> > &names
                   , InputFileOptions                               &inputFileOptions
                   , std::map< std::string, std::string >           &qtModules
+                  , std::map< std::string, std::string >           &qtModulePaths
                   , const std::set<std::string>                    &defines
                   , const WarningFlags                             &warningFlags
                   )
@@ -351,6 +373,11 @@ bool readNamelists( const std::string                              &namelistName
                 continue;
             }
 
+            if (kwd=="#qt_module_path")
+            {
+                inputFileOptions.qtModulePath = name; // unquote(name, '\"');
+                continue;
+            }
 
             if (kwd!="#include")
                 continue;
@@ -365,7 +392,7 @@ bool readNamelists( const std::string                              &namelistName
 
             std::string includedFullName = appendPath( curPath, name );
 
-            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, inputFileOptions, qtModules, defines, warningFlags ))
+            if ( !readNamelists( includedFullName, namesOrder, usedNames, names, inputFileOptions, qtModules, qtModulePaths, defines, warningFlags ))
                return false;
 
             continue;
@@ -414,7 +441,12 @@ bool readNamelists( const std::string                              &namelistName
         names[typeName].insert( curIncludes.begin(), curIncludes.end() );
 
         if (!inputFileOptions.qtModule.empty())
+        {
             qtModules[typeName] = inputFileOptions.qtModule;
+
+            if (!inputFileOptions.qtModulePath.empty())
+                qtModulePaths[inputFileOptions.qtModule] = inputFileOptions.qtModulePath;
+        }
 
         /*
         if (typeName=="swap")
@@ -454,6 +486,7 @@ int main( int argc, char *argv[])
     bool        generateGitAdd  = false;
 
     std::map< std::string, std::string > qtModules;
+    std::map< std::string, std::string > qtModulePaths;
 
     std::set< std::string>      defines;
 
@@ -632,7 +665,7 @@ int main( int argc, char *argv[])
 
 
 
-    if (!readNamelists( namelistName, namesOrder, usedNames, names, inputFileOptions, qtModules, defines, warningFlags ))
+    if (!readNamelists( namelistName, namesOrder, usedNames, names, inputFileOptions, qtModules, qtModulePaths, defines, warningFlags ))
         return 2;
 
 
@@ -757,12 +790,24 @@ int main( int argc, char *argv[])
         if ( qtModIt!=qtModules.end() )
         {
 
+            // Qt
+
             const std::string &qtModule = qtModIt->second;
 
             std::set<std::string>::const_iterator itInc = includesSet.begin();
             for(; itInc!=includesSet.end(); ++itInc)
             {
-                std::string incName = appendPath( qtModule, *itInc );
+
+                std::string qtModulePath = qtModule;
+
+                std::map< std::string, std::string >::const_iterator qmpIt = qtModulePaths.find(qtModule);
+
+                if (qmpIt!=qtModulePaths.end())
+                {
+                    qtModulePath = unquote(qmpIt->second, '\"');
+                }
+
+                std::string incName = appendPath( qtModulePath, *itInc ); // qtModulePath.empty() ? *itInc : appendPath( qtModulePath, *itInc );
 
                 incName = quoteInclude( incName, includeModeUser );
 
@@ -774,6 +819,9 @@ int main( int argc, char *argv[])
         }
         else
         {
+
+            // std
+
             std::set<std::string>::const_iterator itInc = includesSet.begin();
             for(; itInc!=includesSet.end(); ++itInc)
             {
