@@ -8,9 +8,9 @@ And the required header will be automatically included.
 
 ### Pregenerated C++ std::* and Qt headers
 
-For C++ std types library look to the https://github.com/al-martyn1/std_headers
+For C++ std types library look to the https://github.com/al-martyn1/_std_headers
 
-For Qt types library look to the https://github.com/al-martyn1/qt_headers
+For Qt types library look to the https://github.com/al-martyn1/_qt_headers
 
 ### Building and deploying
 
