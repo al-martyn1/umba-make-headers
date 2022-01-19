@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <sstream>
 
+int qtVersion = 5;
+
 
 //----------------------------------------------------------------------------
 struct WarningFlags
@@ -239,6 +241,18 @@ bool isFullUppercase( const std::string &str )
 
     return true;
 
+}
+
+//----------------------------------------------------------------------------
+std::string toUpper(std::string s)
+{
+    for( auto &ch : s )
+    {
+        if (ch>='a' && ch<='z')
+            ch = ch - 'a' + 'A';
+    }
+
+    return s;
 }
 
 //----------------------------------------------------------------------------
@@ -525,6 +539,8 @@ int main( int argc, char *argv[])
                  << "    -h, --help                     - print this help and exit" << endl
                  << "    -w, --where                    - print full path to self executable" << endl
                  << "    -g, --git-add                  - turns on 'git-add.bat' file generation" << endl
+                 << "    -5, --qt5                      - set Qt version to 5" << endl
+                 << "    -6, --qt6                      - set Qt version to 6" << endl
                  /*<< "    -g=val, --guard-prefix=val     - prefix for guard macro, e.g. 'std'" << endl */
                  /*<< "    -i=val, --include-prefix=val   - include prefix (path)" << endl */
                  << "    -c, --clean                    - clean generated files" << endl
@@ -556,6 +572,16 @@ int main( int argc, char *argv[])
         {
             ++optIt; // move to next option
             generateGitAdd = true;
+        }
+        else if (*optIt=="-5" || *optIt=="--qt5")
+        {
+            ++optIt; // move to next option
+            qtVersion = 5;
+        }
+        else if (*optIt=="-6" || *optIt=="--qt6")
+        {
+            ++optIt; // move to next option
+            qtVersion = 6;
         }
         /*
         else if (*optIt=="-g" || *optIt=="--guard-prefix")
@@ -846,7 +872,16 @@ int main( int argc, char *argv[])
 
         if ( qtModIt!=qtModules.end() )
         {
-            const std::string &qtModule = qtModIt->second;
+            std::string qtModule = qtModIt->second;
+            std::string qtModuleUpperCase = toUpper(qtModule);
+
+            if (qtModule.size()>=3)
+            {
+                if ( qtModuleUpperCase[0]=='Q' && qtModuleUpperCase[1]=='T' && (qtModuleUpperCase[2]!='5' && qtModuleUpperCase[2]!='6') )
+                {
+                    qtModule.insert(2,1,'0' + qtVersion); // ( size_type index, size_type count, CharT ch );
+                }
+            }
 
             ofs << "    #if defined(_MSC_VER)" << endl << endl;
 
