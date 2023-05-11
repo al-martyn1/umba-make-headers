@@ -561,7 +561,7 @@ int main( int argc, char *argv[])
                  << "If namelist.txt file name is ommited, default file name 'namelist.txt' without path is used" << endl
                  ;
 
-            return 1;
+            return 0;
         }
         else if (*optIt=="-w" || *optIt=="--where")
         {
